@@ -5,7 +5,7 @@
 # Author: Jinlong Yang
 #
 
-from carol.bastion.app import Bastion
+from colin.bastion.app import Bastion
 
 app = Bastion()
 bastion = app.entry_point()

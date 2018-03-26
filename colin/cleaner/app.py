@@ -12,7 +12,7 @@ from datetime import date, timedelta
 from oslo_config import cfg
 from osmo.basic import Basic
 
-from carol.cleaner.core.parser import SSHIOParser
+from colin.cleaner.core.parser import SSHIOParser
 
 CONF = cfg.CONF
 

@@ -1,4 +1,4 @@
-Carol
+Colin
 ----
 
 ## Features
@@ -12,15 +12,15 @@ Carol
 
 ## Install
 
-    python3 tools/install_venv.py
-    tools/with_venv.sh pip install git+git://github.com/yyjinlong/paramiko.git#egg=paramiko
-    tools/with_venv.sh python setup.py develop
+    $ python3 tools/install_venv.py
+    $ tools/with_venv.sh pip install git+git://github.com/yyjinlong/paramiko.git#egg=paramiko
+    $ tools/with_venv.sh python setup.py develop
 
 
 ## Usage
 
     bastion server:
-    $ tools/with_venv.sh carol-bastion --config-file=etc/development.conf
+    $ tools/with_venv.sh colin-bastion --config-file=etc/development.conf
 
     cleaner server:
-    $ tools/with_venv.sh carol-cleaner --config-file=etc/development.conf
+    $ tools/with_venv.sh colin-cleaner --config-file=etc/development.conf

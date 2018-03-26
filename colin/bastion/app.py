@@ -17,22 +17,22 @@ from oslo_config import cfg
 from osmo.basic import Basic
 from oslo_log import log as logging
 
-import carol.util.common as cm
-from carol.bastion.core.ssh_intf import SSHKeyGen
-from carol.bastion.core.ssh_intf import SSHServer
-from carol.bastion.core.ssh_jump import SSHJump
+import colin.util.common as cm
+from colin.bastion.core.ssh_intf import SSHKeyGen
+from colin.bastion.core.ssh_intf import SSHServer
+from colin.bastion.core.ssh_jump import SSHJump
 
 LOG = logging.getLogger(__name__)
 
 server_opts = [
     cfg.StrOpt('host', default='0.0.0.0',
-                help='carol bastion server listen address.'),
+                help='colin bastion server listen address.'),
     cfg.IntOpt('port', default=None,
-                help='carol bastion server listen port.'),
+                help='colin bastion server listen port.'),
     cfg.IntOpt('pool_limit', default=None,
-                help='carol bastion server process pool size.'),
+                help='colin bastion server process pool size.'),
     cfg.IntOpt('session_limit', default=None,
-                help='carol bastion server session clone size.')
+                help='colin bastion server session clone size.')
 ]
 
 ssh_opts = [

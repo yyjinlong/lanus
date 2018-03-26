@@ -12,7 +12,7 @@ from io import StringIO
 import paramiko
 from oslo_log import log as logging
 
-from carol.util.service import CarolService
+from colin.util.service import ColinService
 
 LOG = logging.getLogger(__name__)
 
@@ -25,7 +25,7 @@ class SSHServer(paramiko.ServerInterface):
         context.change_win_size_event = threading.Event()
 
     def check_auth_password(self, username, password):
-        hs = CarolService()
+        hs = ColinService()
         if hs.validate(username, password):
             self.context.username = username
             return paramiko.AUTH_SUCCESSFUL

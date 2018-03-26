@@ -15,8 +15,8 @@ import paramiko
 from oslo_log import log as logging
 from oslo_config import cfg
 
-import carol.util.common as cm
-from carol.util.service import CarolService
+import colin.util.common as cm
+from colin.util.service import ColinService
 
 LOG = logging.getLogger(__name__)
 
@@ -45,7 +45,7 @@ class SSHProxy(object):
         self.context = context
         self.username = context.username
         self.client_channel = client_channel
-        self.password = CarolService().get_ldap_pass(self.username)
+        self.password = ColinService().get_ldap_pass(self.username)
 
     def login(self, asset_info, term='xterm', width=80, height=24):
         self.ip = asset_info.ip
