@@ -1,4 +1,4 @@
-Colin
+Lanus
 ----
 
 ## Features

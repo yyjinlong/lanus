@@ -11,3 +11,4 @@ setup(
     setup_requires=['pbr'],
     pbr=True
 )
+
