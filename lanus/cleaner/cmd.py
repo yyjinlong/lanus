@@ -5,7 +5,7 @@
 # Author: Jinlong Yang
 #
 
-from colin.cleaner.app import LOGCleaner
+from lanus.cleaner.app import LOGCleaner
 
 app = LOGCleaner()
 cleaner = app.entry_point()

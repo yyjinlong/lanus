@@ -12,7 +12,7 @@ from io import StringIO
 import paramiko
 from oslo_log import log as logging
 
-from colin.util.service import ColinService
+from lanus.util.service import LanusService
 
 LOG = logging.getLogger(__name__)
 
@@ -25,7 +25,7 @@ class SSHServer(paramiko.ServerInterface):
         context.change_win_size_event = threading.Event()
 
     def check_auth_password(self, username, password):
-        hs = ColinService()
+        hs = LanusService()
         if hs.validate(username, password):
             self.context.username = username
             return paramiko.AUTH_SUCCESSFUL
@@ -58,6 +58,11 @@ class SSHServer(paramiko.ServerInterface):
                                             pixelwidth, pixelheight):
         # NOTE(win_width and win_height in ``context`` or ``client channel``,
         # but the main usage ``context``)
+        # TODO: channel感知窗口变化, 需要传到对应的channel上去改变.这里,
+        #       可能导致主进程获取的窗口大小变化, 传到别的channel上.
+        #       这块的事件通知机制要改。
+        #       主进程感知某个channel(一个channel一个线程)窗口变化，需要事件通知
+        #       到对应的channel去更新窗口大小.
         self.context.win_width = channel.win_width = width
         self.context.win_height = channel.win_height = height
         self.context.change_win_size_event.set()

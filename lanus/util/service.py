@@ -10,7 +10,7 @@ from dotmap import DotMap
 from oslo_config import cfg
 from oslo_log import log as logging
 
-import colin.util.common as cm
+import lanus.util.common as cm
 
 LOG = logging.getLogger(__name__)
 
@@ -29,7 +29,7 @@ CONF = cfg.CONF
 CONF.register_opts(intf_opts, 'INTF')
 
 
-class ColinService(object):
+class LanusService(object):
 
     def validate(self, username, password):
         url = CONF.INTF.user_valid_intf

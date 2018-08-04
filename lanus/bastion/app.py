@@ -5,6 +5,7 @@
 # Author: Jinlong Yang
 #
 
+import os
 import sys
 import socket
 import signal
@@ -17,22 +18,22 @@ from oslo_config import cfg
 from osmo.basic import Basic
 from oslo_log import log as logging
 
-import colin.util.common as cm
-from colin.bastion.core.ssh_intf import SSHKeyGen
-from colin.bastion.core.ssh_intf import SSHServer
-from colin.bastion.core.ssh_jump import SSHJump
+import lanus.util.common as cm
+from lanus.bastion.core.ssh_intf import SSHKeyGen
+from lanus.bastion.core.ssh_intf import SSHServer
+from lanus.bastion.core.ssh_jump import SSHJump
 
 LOG = logging.getLogger(__name__)
 
 server_opts = [
     cfg.StrOpt('host', default='0.0.0.0',
-                help='colin bastion server listen address.'),
+                help='lanus bastion server listen address.'),
     cfg.IntOpt('port', default=None,
-                help='colin bastion server listen port.'),
+                help='lanus bastion server listen port.'),
     cfg.IntOpt('pool_limit', default=None,
-                help='colin bastion server process pool size.'),
+                help='lanus bastion server process pool size.'),
     cfg.IntOpt('session_limit', default=None,
-                help='colin bastion server session clone size.')
+                help='lanus bastion server session clone size.')
 ]
 
 ssh_opts = [
@@ -49,7 +50,7 @@ def SignalHandler():
     signal.signal(signal.SIGINT, signal.SIG_IGN)
 
 
-def SSHBootstrap(client, rhost):
+def SSHBootstrap(client, rhost, rport):
     context = DotMap()
     context.client = client
     context.channel_list = []
@@ -120,6 +121,10 @@ def SSHBootstrap(client, rhost):
         # 自动退出，需要将自己自动从该列表剔除)
         context.channel_list.append(client_channel)
 
+        pid = os.getpid()
+        LOG.info('*** Login user: %s from (%s:%s) on pid: %s.'
+                 % (context.username, rhost, rport, pid))
+
         # NOTE(client channel 不能多线程共享全局变量, 否则session就会乱)
         ssh_jump = SSHJump(context, client_channel)
         ssh_jump.start()
@@ -153,7 +158,7 @@ class Bastion(Basic):
             cs.setblocking(0)
             # TODO: 添加记录使用进程数，并判断进程数是否已满，并给出提示
             try:
-                self.pool.apply_async(SSHBootstrap, (cs, rhost))
+                self.pool.apply_async(SSHBootstrap, (cs, rhost, rport))
             except KeyboardInterrupt:
                 self.pool.terminate()
                 self.pool.close()

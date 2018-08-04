@@ -13,9 +13,9 @@ import traceback
 from oslo_log import log as logging
 from oslo_config import cfg
 
-import colin.util.common as cm
-from colin.util.service import ColinService
-from colin.bastion.core.ssh_proxy import SSHProxy
+import lanus.util.common as cm
+from lanus.util.service import LanusService
+from lanus.bastion.core.ssh_proxy import SSHProxy
 
 LOG = logging.getLogger(__name__)
 
@@ -38,7 +38,7 @@ class SSHJump(threading.Thread):
         self.client = context.client
         self.username = context.username
         self.client_channel = client_channel
-        self.assets = ColinService().get_user_asset(self.username)
+        self.assets = LanusService().get_user_asset(self.username)
 
     def run(self):
         self.display_banner()
