@@ -3,3 +3,4 @@ osmo >= 0.3.3
 pyte >= 0.7.0
 dotmap >= 1.2.17
 requests >= 2.18.4
+
