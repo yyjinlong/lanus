@@ -16,7 +16,8 @@ from oslo_log import log as logging
 from oslo_config import cfg
 
 import lanus.util.common as cm
-from lanus.util.service import LanusService
+from lanus.bastion.lib.service import LanusService
+from lanus.bastion.lib.cleaner import IOCleaner
 
 LOG = logging.getLogger(__name__)
 
@@ -50,8 +51,8 @@ class SSHProxy(object):
     def login(self, asset_info, term='xterm', width=80, height=24):
         self.ip = asset_info.ip
         self.port = asset_info.port
-        width = self.context.win_width
-        height = self.context.win_height
+        width = self.client_channel.win_width
+        height = self.client_channel.win_height
         ssh_client = paramiko.SSHClient()
         ssh_client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
         self.client_channel.sendall(
@@ -112,14 +113,16 @@ class SSHProxy(object):
                     return
                 sys.exit(1)
 
-            if self.context.change_win_size_event.is_set():
-                self.context.change_win_size_event.clear()
-                width = self.context.win_width
-                height = self.context.win_height
-                LOG.debug('*** Proxy fetch change window size (%s, %s).'
-                          % (width, height))
+            try:
+                change_data = self.context[self.client_channel].get_nowait()
+                width = change_data.get('width')
+                height = change_data.get('height')
+                LOG.debug('*** Proxy fetch channel: %s window change size: '
+                          '(%s, %s).' % (self.client_channel, width, height))
                 if backend_channel:
                     backend_channel.resize_pty(width=width, height=height)
+            except:
+                pass
 
             if client_channel in fd_sets:
                 is_input_status = True
@@ -141,15 +144,16 @@ class SSHProxy(object):
                     LOG.info('*** Logout from user: %s on host: %s.'
                              % (self.username, self.ip))
                     # NOTE(退出该机器, 不能执行sys.exit(1)终止该线程,
-                    # 而是再次回到线程中等待下一次用户的输入)
+                    #      而是再次回到线程中等待下一次用户的输入)
                     self.logout_handle(backend_channel)
                     return
 
                 if is_input_status:
                     log_info.append(backend_data)
                 else:
-                    msg = b''.join(log_info).decode('utf-8', errors='ignore')
-                    self.write_log(msg)
+                    io_cleaner = IOCleaner(client_channel.win_width,
+                                           client_channel.win_height)
+                    self.write_log(io_cleaner.clean(b''.join(log_info)))
                     log_info.clear()
                     log_info.append(backend_data.lstrip(b'\r\n'))
                 client_channel.sendall(backend_data)

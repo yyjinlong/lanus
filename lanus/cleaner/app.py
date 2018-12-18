@@ -10,9 +10,9 @@ import subprocess
 from datetime import date, timedelta
 
 from oslo_config import cfg
-from osmo.basic import Basic
+from osmo.base import Application
 
-from lanus.cleaner.core.parser import SSHIOParser
+from lanus.cleaner.core.cleaner import IOCleaner
 
 CONF = cfg.CONF
 
@@ -27,13 +27,13 @@ CONF = cfg.CONF
 CONF.register_opts(record_opts, 'RECORD')
 
 
-class LOGCleaner(Basic):
+class LOGCleaner(Application):
     name = 'log cleaner'
     version = '0.1'
 
     def __init__(self):
         super(LOGCleaner, self).__init__()
-        self.io_parser = SSHIOParser()
+        self.io_cleaner = IOCleaner()
 
     def run(self):
         clean_day = None
@@ -57,7 +57,7 @@ class LOGCleaner(Basic):
         log_file_path = '%s/%s' % (log_path, log_file)
         with open(log_file_path) as fp:
             for line in fp:
-                result = self.io_parser.tty_output_parser(line)
+                result = self.io_cleaner.tty_output_clean(line)
                 log_info.append(result)
         self.write_back(log_path, log_file, log_info)
         try:

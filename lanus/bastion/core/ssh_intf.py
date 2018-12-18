@@ -12,7 +12,7 @@ from io import StringIO
 import paramiko
 from oslo_log import log as logging
 
-from lanus.util.service import LanusService
+from lanus.bastion.lib.service import LanusService
 
 LOG = logging.getLogger(__name__)
 
@@ -44,8 +44,8 @@ class SSHServer(paramiko.ServerInterface):
                                   pixelwidth, pixelheight, modes):
         # NOTE(win_width and win_height in ``context`` or ``client channel``,
         # but the main usage ``context``)
-        self.context.win_width = channel.win_width = width
-        self.context.win_height = channel.win_height = height
+        channel.win_width = width
+        channel.win_height = height
         LOG.info('*** Interface check channel pty term: %s size: (%s, %s)'
                  % (term, width, height))
         return True
@@ -58,16 +58,16 @@ class SSHServer(paramiko.ServerInterface):
                                             pixelwidth, pixelheight):
         # NOTE(win_width and win_height in ``context`` or ``client channel``,
         # but the main usage ``context``)
-        # TODO: channel感知窗口变化, 需要传到对应的channel上去改变.这里,
-        #       可能导致主进程获取的窗口大小变化, 传到别的channel上.
-        #       这块的事件通知机制要改。
-        #       主进程感知某个channel(一个channel一个线程)窗口变化，需要事件通知
-        #       到对应的channel去更新窗口大小.
-        self.context.win_width = channel.win_width = width
-        self.context.win_height = channel.win_height = height
-        self.context.change_win_size_event.set()
-        LOG.debug('*** Interface check channel window change data: (%s, %s).'
-                  % (width, height))
+        channel.win_width = width
+        channel.win_height = height
+
+        # NOTE(一个channel对应一个线程、一个channel对应一个队列)
+        # NOTE(主进程感知某个channel的窗口变化, 将数据发送到对应的队列中,
+        #      channel线程从队列取出数据, 根据该数据动态调整窗口大小.)
+        change_data = {'width': width, 'height': height}
+        self.context[channel].put(change_data)
+        LOG.debug('*** Interface check channel: %s window change data: '
+                  '(%s, %s).' % (channel, width, height))
         return True
 
 

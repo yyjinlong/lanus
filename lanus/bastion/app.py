@@ -7,6 +7,7 @@
 
 import os
 import sys
+import queue
 import socket
 import signal
 import traceback
@@ -15,7 +16,7 @@ import multiprocessing
 import paramiko
 from dotmap import DotMap
 from oslo_config import cfg
-from osmo.basic import Basic
+from osmo.base import Application
 from oslo_log import log as logging
 
 import lanus.util.common as cm
@@ -51,6 +52,7 @@ def SignalHandler():
 
 
 def SSHBootstrap(client, rhost, rport):
+    # NOTE(为每一个socket进程定义一些全局属性; 每个channel线程共享.)
     context = DotMap()
     context.client = client
     context.channel_list = []
@@ -120,6 +122,7 @@ def SSHBootstrap(client, rhost, rport):
         # NOTE(channel list 需要多个线程共享, 因为若某个线程(session)
         # 自动退出，需要将自己自动从该列表剔除)
         context.channel_list.append(client_channel)
+        context[client_channel] = queue.Queue()
 
         pid = os.getpid()
         LOG.info('*** Login user: %s from (%s:%s) on pid: %s.'
@@ -137,7 +140,7 @@ def SSHBootstrap(client, rhost, rport):
     LOG.info('*** Client from %s transport.is_active() is false.' % rhost)
 
 
-class Bastion(Basic):
+class Bastion(Application):
     name = 'bastion'
     version = '0.1'
 
@@ -156,7 +159,6 @@ class Bastion(Basic):
             cs, (rhost, rport) = self.fd.accept()
             LOG.info('*** Receive client addr: %s:%s' % (rhost, rport))
             cs.setblocking(0)
-            # TODO: 添加记录使用进程数，并判断进程数是否已满，并给出提示
             try:
                 self.pool.apply_async(SSHBootstrap, (cs, rhost, rport))
             except KeyboardInterrupt:

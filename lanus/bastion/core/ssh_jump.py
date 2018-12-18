@@ -14,8 +14,8 @@ from oslo_log import log as logging
 from oslo_config import cfg
 
 import lanus.util.common as cm
-from lanus.util.service import LanusService
 from lanus.bastion.core.ssh_proxy import SSHProxy
+from lanus.bastion.lib.service import LanusService
 
 LOG = logging.getLogger(__name__)
 
