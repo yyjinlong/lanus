@@ -17,7 +17,7 @@ LOG = logging.getLogger(__name__)
 intf_opts = [
     cfg.StrOpt('salt',
                help='bastion service interface md5 salt value.'),
-    cfg.StrOpt('user_valid_intf',
+    cfg.StrOpt('user_check_intf',
                help='bastion service user login validate interface.'),
     cfg.StrOpt('user_asset_intf',
                help='bastion service fetch user asset info interface.'),
@@ -32,12 +32,12 @@ CONF.register_opts(intf_opts, 'INTF')
 class LanusService(object):
 
     def validate(self, username, password):
-        url = CONF.INTF.user_valid_intf
+        url = CONF.INTF.user_check_intf
         payload = {
             'username': username,
             'password': password
         }
-        user_info = cm.http_handler(url, payload, 'POST')
+        user_info = cm.http_handler(url, cm.HTTP.POST,  payload=payload)
         if user_info is None:
             return False
         return True
@@ -59,7 +59,7 @@ class LanusService(object):
         }
         sign = cm.parameter_sign(payload)
         payload['sign'] = sign
-        assets = cm.http_handler(url, payload, 'POST')
+        assets = cm.http_handler(url, cm.HTTP.POST, payload=payload)
         if assets is None:
             return asset_list
         asset_list = [DotMap(item) for item in assets if item]
@@ -72,5 +72,5 @@ class LanusService(object):
         }
         sign = cm.parameter_sign(payload)
         payload['sign'] = sign
-        password = cm.http_handler(url, payload, 'POST')
+        password = cm.http_handler(url, cm.HTTP.POST, payload=payload)
         return password

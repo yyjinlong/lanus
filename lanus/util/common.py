@@ -42,6 +42,15 @@ class TimeoutResult(Enum):
     CHILD_TIMEOUT = 1
 
 
+@unique
+class HTTP(Enum):
+
+    GET = 0
+    POST = 1
+    PUT = 2
+    DELETE = 3
+
+
 def terminal_art():
     art = "\033[1;35m\r\n"
     art += " " * 4 + "                                           \r\n"
@@ -138,31 +147,33 @@ def parameter_sign(data):
         (encrypt_data+CONF.INTF.salt).encode()).hexdigest().upper()
 
 
-def http_handler(url, payload, http_type='GET'):
-    """ Use ``requests`` library handle http get or post request.
-
-    URL interface return value is json object. such as:
-    {'errcode': 0/1, 'errmsg': 'xxxx', data: []/{}/value}
-
-
-    :returns: data is list or dict or concrete value if request success,
-              or ``None``
+def http_handler(url, http_type, headers=None, payload=None):
+    """ URL interface return value is json object.
+    such as:
+    {
+        'errcode': 0/1,
+        'errmsg': 'xxxx',
+        'data': []/{}/value
+    }
+    returns:
+        data is list or dict or concrete value if success, or ``None``
     """
     try:
-        if http_type == 'POST':
-            resp = requests.post(url, data=payload)
+        if http_type == HTTP.GET:
+            resp = requests.get(url, params=payload, headers=headers)
+        elif http_type == HTTP.POST:
+            resp = requests.post(url, data=payload, headers=headers)
         else:
-            resp = requests.get(url, params=payload)
+            LOG.warn('** Unknown http type.')
+            return None
     except Exception as _ex:
-        LOG.error('*** Request %s eception: %s' % (http_type, str(_ex)))
+        LOG.error('** Http request failed: %s.' % str(_ex))
         return None
-    status_code = resp.status_code
-    if status_code != 200:
-        LOG.error('*** Request %s http code: %s' % (http_type, status_code))
+    if resp.status_code != 200:
+        LOG.error('** Http request status code: %s.' % resp.status_code)
         return None
     ret_info = resp.json()
-    errcode = ret_info.get('errcode')
-    if errcode != 0:
+    if ret_info.get('errcode') != 0:
         errmsg = ret_info.get('errmsg')
         LOG.warn('*** Request intf: %s data failed: %s' % (url, errmsg))
         return None
