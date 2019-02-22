@@ -74,6 +74,7 @@ def SSHBootstrap(client, rhost, rport):
         transport.start_server(server=ssh_server)
     except paramiko.SSHException as _ex:
         LOG.error('*** Bootstrap ssh start server failed: %s' % str(_ex))
+        LOG.error(traceback.format_exc())
         client.close()
         sys.exit(1)
 
