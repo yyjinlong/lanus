@@ -6,6 +6,7 @@
 #
 
 import os
+import re
 import sys
 import time
 import selectors
@@ -67,10 +68,11 @@ class SSHProxy(object):
             LOG.error(msg)
             self.client_channel.sendall(cm.ws(msg, level='warn'))
             return False
+        channel_id = self.client_channel.get_id()
         remote_host = self.context.remote_host
         login_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
         login_info = ('This Login: %s form %s' % (login_time, remote_host))
-        self.write_log(login_info)
+        self.write_log(channel_id, login_info)
         LOG.info('*** User: %s connected to host: %s success.'
                  % (self.username, self.ip))
         backend_channel = ssh_client.invoke_shell(
@@ -80,7 +82,10 @@ class SSHProxy(object):
         return True
 
     def interactive_shell(self, backend_channel):
+        count = 0
+        cmd_info = []
         log_info = []
+        prev_cmd = ''
         is_input_status = True
         begin_time = None
         client = self.context.client
@@ -125,6 +130,7 @@ class SSHProxy(object):
                 pass
 
             if client_channel in fd_sets:
+                count = 0
                 is_input_status = True
                 client_data = client_channel.recv(cm.BUF_SIZE)
                 if len(client_data) == 0:
@@ -149,13 +155,35 @@ class SSHProxy(object):
                     return
 
                 if is_input_status:
+                    cmd_info.append(backend_data)
                     log_info.append(backend_data)
                 else:
+                    channel_id = client_channel.get_id()
+                    cur_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
                     io_cleaner = IOCleaner(client_channel.win_width,
                                            client_channel.win_height)
-                    self.write_log(io_cleaner.clean(b''.join(log_info)))
-                    log_info.clear()
-                    log_info.append(backend_data.lstrip(b'\r\n'))
+                    input_cmd = io_cleaner.input_clean(b''.join(cmd_info)).strip()
+                    if input_cmd:
+                        cmd_msg = '[%s] %s' % (cur_time, input_cmd)
+                        self.write_cmd(channel_id, cmd_msg)
+                        cmd_info.clear()
+                        prev_cmd = input_cmd
+                    if re.search('sz\s+.*', input_cmd) is not None or \
+                       re.search('sz\s+.*', prev_cmd) is not None or \
+                       input_cmd in ['rz', 'sl']:
+                        log_info.clear()
+                    else:
+                        if count < 2:
+                            output_msg = io_cleaner.output_clean(b''.join(log_info))
+                            self.write_log(channel_id, output_msg)
+                            log_info.clear()
+                            log_info.append(backend_data.lstrip(b'\r\n'))
+                        elif count == 2:
+                            # NOTE(当输出小于等于2个包, 就不再进行记录.)
+                            self.write_log(channel_id, '..........truncated.')
+                            log_info.clear()
+                            prev_cmd = ''
+                    count += 1
                 client_channel.sendall(backend_data)
                 time.sleep(paramiko.common.io_sleep)
 
@@ -204,14 +232,20 @@ class SSHProxy(object):
         except:
             pass
 
-    def write_log(self, operation_info):
+    def write_log(self, channel_id, operation_info):
+        self._write(channel_id, 'log', operation_info)
+
+    def write_cmd(self, channel_id, operation_info):
+        self._write(channel_id, 'cmd', operation_info)
+
+    def _write(self, channel_id, log_type, operation_info):
         cur_time = datetime.now()
         today = cur_time.strftime('%Y%m%d')
         record_path = '%s/%s' % (CONF.RECORD.record_path, today)
         if not os.path.isdir(record_path):
             os.mkdir(record_path)
-        record_file = ('%s/%s_%s_%s.log'
-                       % (record_path, self.ip, today, self.username))
+        record_file = '%s/%s_%s_%s.%s' % (record_path, self.ip,
+                                          self.username, channel_id, log_type)
         with open(record_file, 'a') as fp:
             fp.write(operation_info)
             fp.write('\n')
