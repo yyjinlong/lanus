@@ -25,14 +25,10 @@ class IOCleaner(object):
         display_list = []
         if not isinstance(data, bytes):
             data = data.encode('utf-8', errors='ignore')
-        try:
-            self.stream.feed(data)
-            display_list = [line.strip('\r\n').strip('\n')
-                            for line in self.screen.display if line.strip()]
-            self.screen.reset()
-        except Exception as _ex:
-            LOG.warn('** Clean operation log info exception: %s' % str(_ex))
-            return [data.decode('utf-8', errors='ignore')]
+        self.stream.feed(data)
+        display_list = [line.strip('\r\n').strip('\n')
+                        for line in self.screen.display if line.strip()]
+        self.screen.reset()
         return display_list
 
     def output_clean(self, data):

@@ -137,8 +137,8 @@ def SSHBootstrap(client, rhost, rport):
         client.close()
     except:
         pass
-    sys.exit(1)
     LOG.info('*** Client from %s transport.is_active() is false.' % rhost)
+    sys.exit(1)
 
 
 class Bastion(Application):

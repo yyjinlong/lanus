@@ -10,6 +10,7 @@ import re
 import sys
 import time
 import selectors
+import traceback
 from datetime import datetime
 
 import paramiko
@@ -82,7 +83,6 @@ class SSHProxy(object):
         return True
 
     def interactive_shell(self, backend_channel):
-        count = 0
         cmd_info = []
         log_info = []
         prev_cmd = ''
@@ -130,7 +130,6 @@ class SSHProxy(object):
                 pass
 
             if client_channel in fd_sets:
-                count = 0
                 is_input_status = True
                 client_data = client_channel.recv(cm.BUF_SIZE)
                 if len(client_data) == 0:
@@ -162,28 +161,43 @@ class SSHProxy(object):
                     cur_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
                     io_cleaner = IOCleaner(client_channel.win_width,
                                            client_channel.win_height)
-                    input_cmd = io_cleaner.input_clean(b''.join(cmd_info)).strip()
-                    if input_cmd:
-                        cmd_msg = '[%s] %s' % (cur_time, input_cmd)
-                        self.write_cmd(channel_id, cmd_msg)
-                        cmd_info.clear()
-                        prev_cmd = input_cmd
-                    if re.search('sz\s+.*', input_cmd) is not None or \
-                       re.search('sz\s+.*', prev_cmd) is not None or \
-                       input_cmd in ['rz', 'sl']:
-                        log_info.clear()
-                    else:
-                        if count < 2:
+                    try:
+                        # NOTE(记录命令-清洗)
+                        input_cmd = io_cleaner.input_clean(b''.join(cmd_info)).strip()
+                        if input_cmd:
+                            cmd_msg = '[%s] %s' % (cur_time, input_cmd)
+                            self.write_cmd(channel_id, cmd_msg)
+                            cmd_info.clear()
+                            prev_cmd = input_cmd
+
+                        # NOTE(记录输出-清洗)
+                        if re.search('sz\s+.*', input_cmd) is not None or \
+                           re.search('sz\s+.*', prev_cmd) is not None or \
+                           input_cmd in ['rz', 'sl']:
+                            # NOTE(sz、rz、sl等命令不记录输出)
+                            log_info.clear()
+                        else:
                             output_msg = io_cleaner.output_clean(b''.join(log_info))
                             self.write_log(channel_id, output_msg)
                             log_info.clear()
                             log_info.append(backend_data.lstrip(b'\r\n'))
-                        elif count == 2:
-                            # NOTE(当输出小于等于2个包, 就不再进行记录.)
-                            self.write_log(channel_id, '..........truncated.')
+                    except:
+                        traceback.print_exc()
+                        try:
+                            # NOTE(记录命令-不清洗)
+                            input_cmd = b''.join(cmd_info).decode('utf-8', errors='ignore')
+                            cmd_msg = '[%s] %s' % (cur_time, input_cmd)
+                            self.write_cmd(channel_id, cmd_msg)
+                            cmd_info.clear()
+
+                            # NOTE(记录日志-不清洗)
+                            output_msg = b''.join(log_info).decode('utf-8', errors='ignore')
+                            self.write_log(channel_id, output_msg)
                             log_info.clear()
-                            prev_cmd = ''
-                    count += 1
+                            log_info.append(backend_data.lstrip(b'\r\n'))
+                        except:
+                            traceback.print_exc()
+
                 client_channel.sendall(backend_data)
                 time.sleep(paramiko.common.io_sleep)
 
