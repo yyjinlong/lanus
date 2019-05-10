@@ -22,13 +22,10 @@ class IOCleaner(object):
         display_list = []
         if not isinstance(data, bytes):
             data = data.encode('utf-8', errors='ignore')
-        try:
-            self.stream.feed(data)
-            display_list = [line
-                            for line in self.screen.display if line.strip()]
-            self.screen.reset()
-        except Exception as _ex:
-            print ('** tty parser log error: %s' % str(_ex))
+        self.stream.feed(data)
+        display_list = [line
+                        for line in self.screen.display if line.strip()]
+        self.screen.reset()
         return display_list
 
     def tty_input_clean(self, data):

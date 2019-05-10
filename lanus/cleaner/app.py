@@ -57,7 +57,10 @@ class LOGCleaner(Application):
         log_file_path = '%s/%s' % (log_path, log_file)
         with open(log_file_path) as fp:
             for line in fp:
-                result = self.io_cleaner.tty_output_clean(line)
+                try:
+                    result = self.io_cleaner.tty_output_clean(line)
+                except:
+                    result = line
                 log_info.append(result)
         self.write_back(log_path, log_file, log_info)
         try:
