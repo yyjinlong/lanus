@@ -90,6 +90,8 @@ class SSHProxy(object):
         begin_time = None
         client = self.context.client
         client_channel = self.client_channel
+        io_cleaner = IOCleaner(client_channel.win_width,
+                               client_channel.win_height)
 
         sel = selectors.DefaultSelector()
         sel.register(client, selectors.EVENT_READ)
@@ -159,8 +161,6 @@ class SSHProxy(object):
                 else:
                     channel_id = client_channel.get_id()
                     cur_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-                    io_cleaner = IOCleaner(client_channel.win_width,
-                                           client_channel.win_height)
                     try:
                         # NOTE(记录命令-清洗)
                         input_cmd = io_cleaner.input_clean(b''.join(cmd_info)).strip()

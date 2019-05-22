@@ -9,6 +9,8 @@ Lanus
 
 * Command Record
 
+* Log clean
+
 
 ## Install
 
@@ -21,6 +23,3 @@ Lanus
 
     bastion server:
     $ tools/with_venv.sh lanus-bastion --config-file=etc/development.conf
-
-    cleaner server:
-    $ tools/with_venv.sh lanus-cleaner --config-file=etc/development.conf
