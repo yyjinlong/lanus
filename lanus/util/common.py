@@ -92,10 +92,23 @@ def terminal_nav(username):
 搜索登录(如果唯一).\r
         ➜  输入{color}/{end} + {color}IP, 主机名{end} 搜索, 如: /ip.\r
         ➜  输入{color}P/p{end} 显示您有权限的主机.\r
+        ➜  输入{color}T/t{end} 进入常用工具集.\r
         ➜  输入{color}H/h{end} 帮助.\r
         ➜  输入{color}Q/q{end} 退出.\r
     """.format(color='\033[1;35m', username=username, end='\033[0m')
     return tip
+
+
+def tools_nav():
+    tips = '\r\n'
+    tips += u'\033[1;35m'
+    tips += u'命令执行格式如下: \r\n\r\n'
+    tips += u'    ➜  输入 ip 192.168.0.121 \r\n'
+    tips += u'    ➜  输入 hostname l-jinlong.ops.cn8 \r\n'
+    tips += u'    ➜  输入 clear 清屏\r\n'
+    tips += u'    ➜  输入 quit  退出常用工具查询模式'
+    tips += u'\033[0m'
+    return tips
 
 
 def ws(s, before=0, after=1, level='info'):

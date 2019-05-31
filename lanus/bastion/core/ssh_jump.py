@@ -5,6 +5,7 @@
 # Author: Jinlong Yang
 #
 
+import re
 import sys
 import time
 import threading
@@ -14,6 +15,7 @@ from oslo_log import log as logging
 from oslo_config import cfg
 
 import lanus.util.common as cm
+from lanus.bastion.lib.tools import Tools
 from lanus.bastion.core.ssh_proxy import SSHProxy
 from lanus.bastion.lib.service import LanusService
 
@@ -44,7 +46,7 @@ class SSHJump(threading.Thread):
         self.display_banner()
 
         while True:
-            self.client_channel.sendall(cm.ws(cm.PROMPT, 1, 0))
+            self.client_channel.sendall(cm.ws(cm.PROMPT, before=0, after=0))
             try:
                 self.option_handler()
             except:
@@ -57,13 +59,18 @@ class SSHJump(threading.Thread):
         nav = cm.terminal_nav(self.username)
         self.client_channel.sendall(cm.CLEAR_CHAR)
         self.client_channel.sendall(art + nav)
+        self.client_channel.sendall(cm.ws(''))
 
     def option_handler(self):
         option = self.readline()
-        if option in ['p', 'P']:
+        if not option or option == '':
+            pass
+        elif option in ['p', 'P']:
             self.show_hostlist()
         elif option.startswith('/'):
             self.show_searchinfo(option)
+        elif option in ['t', 'T']:
+            self.entry_tool_page()
         elif option in ['h', 'H']:
             self.display_banner()
         elif option in ['q', 'Q']:
@@ -75,11 +82,12 @@ class SSHJump(threading.Thread):
                 self.redirect_ssh_proxy(search_result[0])
             elif len(search_result) == 0:
                 self.client_channel.sendall(cm.ws(
-                    'No asset match, please input again', level='warn'))
+                    'No asset match, please input again',
+                    after=1, level='warn'))
             else:
                 self.client_channel.sendall(cm.ws(
-                    'Search result not unique, select below or search again',
-                    after=2, level='warn'))
+                    'Search result not unique, search again',
+                    after=1, level='warn'))
                 self.show_hostlist()
 
     def show_hostlist(self):
@@ -124,7 +132,7 @@ class SSHJump(threading.Thread):
         remote_host = self.context.remote_host
         LOG.info('Logout relay from %s:%s' % (remote_host, self.username))
 
-    def readline(self):
+    def readline(self, prompt=cm.PROMPT):
         """ Read one line data from the stream.
 
         This method is a coroutine which reads one line, ending in
@@ -164,7 +172,7 @@ class SSHJump(threading.Thread):
             # NOTE(Ctrl-L 清屏)
             if data.startswith(b'\x0c'):
                 self.client_channel.sendall(cm.CLEAR_CHAR)
-                self.client_channel.sendall(cm.ws(cm.PROMPT, 1, 0))
+                self.client_channel.sendall(cm.ws(prompt, before=1, after=0))
                 continue
 
             # NOTE(Ctrl-U 清行)
@@ -187,7 +195,7 @@ class SSHJump(threading.Thread):
 
             # NOTE(回车符转到相应处理函数)
             if data in cm.ENTER_CHAR:
-                self.client_channel.sendall(cm.ws('', after=2))
+                self.client_channel.sendall(cm.ws('', after=1))
                 option = b''.join(input_data).strip().decode()
                 return option
 
@@ -215,3 +223,39 @@ class SSHJump(threading.Thread):
             if self.client_channel in self.context.channel_list:
                 self.context.channel_list.remove(self.client_channel)
             self.client_channel.close()
+
+    def entry_tool_page(self, prompt='[lanus@tools ~]# '):
+        tips = cm.tools_nav()
+        self.client_channel.sendall(cm.CLEAR_CHAR)
+        self.client_channel.sendall(cm.ws(tips, before=0, after=2))
+        tool_layer = Tools()
+        while True:
+            self.client_channel.sendall(cm.ws(prompt, before=0, after=0))
+            option = self.readline(prompt)
+            if not option or option == '':
+                continue
+            if option == 'clear' :
+                self.client_channel.sendall(cm.CLEAR_CHAR)
+                continue
+            if option == 'quit':
+                break
+
+            op_list = re.split('\s+', option)
+            try:
+                cmd = op_list[0]
+                param = op_list[1]
+            except:
+                result = cm.wc('输入格式错误!', has_bg=False)
+                self.client_channel.sendall(cm.ws(result, before=0, after=1))
+                continue
+
+            try:
+                if cmd == 'ip':
+                    result = tool_layer.run_ip(param)
+                elif cmd == 'hostname':
+                    result = tool_layer.run_hostname(param)
+                else:
+                    result = cm.wc('目前只支持 ip 和 hostname!', has_bg=False)
+            except:
+                result = cm.wc('查询结果不存在!', has_bg=False)
+            self.client_channel.sendall(cm.ws(result, before=0, after=1))
