@@ -53,8 +53,11 @@ class SSHProxy(object):
     def login(self, asset_info, term='xterm', width=80, height=24):
         self.ip = asset_info.ip
         self.port = asset_info.port
-        width = self.client_channel.win_width
-        height = self.client_channel.win_height
+        try:
+            width = self.client_channel.win_width
+            height = self.client_channel.win_height
+        except:
+            pass
         ssh_client = paramiko.SSHClient()
         ssh_client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
         self.client_channel.sendall(
