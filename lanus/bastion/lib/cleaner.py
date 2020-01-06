@@ -6,9 +6,9 @@
 #
 
 import re
+import logging
 
 import pyte
-from oslo_log import log as logging
 
 LOG = logging.getLogger(__name__)
 

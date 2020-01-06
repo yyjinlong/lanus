@@ -9,12 +9,12 @@ import os
 import re
 import sys
 import time
+import logging
 import selectors
 import traceback
 from datetime import datetime
 
 import paramiko
-from oslo_log import log as logging
 from oslo_config import cfg
 
 import lanus.util.common as cm

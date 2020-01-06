@@ -8,10 +8,10 @@
 import re
 import sys
 import time
+import logging
 import threading
 import traceback
 
-from oslo_log import log as logging
 from oslo_config import cfg
 
 import lanus.util.common as cm

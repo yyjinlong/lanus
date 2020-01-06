@@ -10,6 +10,7 @@ import sys
 import queue
 import socket
 import signal
+import logging
 import traceback
 import multiprocessing
 
@@ -17,7 +18,6 @@ import paramiko
 from dotmap import DotMap
 from oslo_config import cfg
 from osmo.base import Application
-from oslo_log import log as logging
 
 import lanus.util.common as cm
 from lanus.bastion.core.ssh_intf import SSHKeyGen
@@ -130,8 +130,11 @@ def SSHBootstrap(client, rhost, rport):
                  % (context.username, rhost, rport, pid))
 
         # NOTE(client channel 不能多线程共享全局变量, 否则session就会乱)
-        ssh_jump = SSHJump(context, client_channel)
-        ssh_jump.start()
+        try:
+            ssh_jump = SSHJump(context, client_channel)
+            ssh_jump.start()
+        except:
+            LOG.error(traceback.print_exc())
 
     try:
         client.close()
@@ -167,7 +170,7 @@ class Bastion(Application):
                 self.pool.close()
             except Exception as _ex:
                 LOG.error('*** SSH bootstrap exception: %s' % str(_ex))
-                traceback.print_exc()
+                LOG.error(traceback.print_exc())
 
     def build_lisen(self):
         self.fd = socket.socket(socket.AF_INET, socket.SOCK_STREAM)

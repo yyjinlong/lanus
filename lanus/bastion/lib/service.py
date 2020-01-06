@@ -5,12 +5,11 @@
 # Author: Jinlong Yang
 #
 
+import logging
 from dotmap import DotMap
 
+import osmo.util as ou
 from oslo_config import cfg
-from oslo_log import log as logging
-
-import lanus.util.common as cm
 
 LOG = logging.getLogger(__name__)
 
@@ -29,7 +28,7 @@ CONF = cfg.CONF
 CONF.register_opts(intf_opts, 'INTF')
 
 
-class LanusService(object):
+class LanusService:
 
     def validate(self, username, password):
         url = CONF.INTF.user_check_intf
@@ -37,9 +36,12 @@ class LanusService(object):
             'username': username,
             'password': password
         }
-        user_info = cm.http_handler(url, cm.HTTP.POST,  payload=payload)
-        if user_info is None:
+        try:
+            user_info = ou.http_handler(url, ou.HTTP.POST,  payload=payload)
+        except Exception as _ex:
+            LOG.error('** request validate api error: %s' % str(_ex))
             return False
+        LOG.info('** user: %s validate pass, info: %s' % (username, user_info))
         return True
 
     def get_user_asset(self, username):
@@ -57,20 +59,26 @@ class LanusService(object):
         payload = {
             'username': username
         }
-        sign = cm.parameter_sign(payload)
+        sign = ou.parameter_sign(payload, CONF.INTF.salt)
         payload['sign'] = sign
-        assets = cm.http_handler(url, cm.HTTP.POST, payload=payload)
-        if assets is None:
+        try:
+            assets = ou.http_handler(url, ou.HTTP.POST, payload=payload)
+        except Exception as _ex:
+            LOG.error('** request asset api error: %s' % str(_ex))
             return asset_list
         asset_list = [DotMap(item) for item in assets if item]
         return asset_list
 
     def get_ldap_pass(self, username):
+        password = ''
         url = CONF.INTF.user_ldap_pass_intf
         payload = {
             'ldap_user': username
         }
-        sign = cm.parameter_sign(payload)
+        sign = ou.parameter_sign(payload, CONF.INTF.salt)
         payload['sign'] = sign
-        password = cm.http_handler(url, cm.HTTP.POST, payload=payload)
+        try:
+            password = ou.http_handler(url, ou.HTTP.POST, payload=payload)
+        except Exception as _ex:
+            LOG.error('** request ldap password api error: %s' % str(_ex))
         return password

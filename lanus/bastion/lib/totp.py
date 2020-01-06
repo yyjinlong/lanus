@@ -5,9 +5,10 @@
 # Author: Jinlong Yang
 #
 
+import logging
+
 import requests
 from oslo_config import cfg
-from oslo_log import log as logging
 
 LOG = logging.getLogger(__name__)
 

@@ -6,11 +6,11 @@
 #
 
 import os
+import logging
 import threading
 from io import StringIO
 
 import paramiko
-from oslo_log import log as logging
 
 from lanus.bastion.lib.service import LanusService
 

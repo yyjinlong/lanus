@@ -22,4 +22,10 @@ Lanus
 ## Usage
 
     bastion server:
-    $ tools/with_venv.sh lanus-bastion --config-file=etc/development.conf
+    $ tools/with_venv.sh lanus-bastion --config-file=etc/dev.conf
+
+
+## Mock Test
+
+    mock api server:
+    $ tools/with_venv.sh lanus-mockapi --config-file=etc/dev.conf
