@@ -245,14 +245,18 @@ class ScreenCAP:
     def _record_all(self, channel_id, cmd_info, log_info, cur_time):
         # NOTE(jinlong): 判断client_channel获取的输入是否包含sz、rz.
         client_cmd = self.io_cleaner.input_clean(b''.join(cmd_info)).strip()
+        if self.prev_cmd and self.is_rzsz(self.prev_cmd, self.prev_cmd) and \
+           self.is_rzsz_end(client_cmd):
+            LOG.info('** End rz/sz because input cmd: %s' % client_cmd)
+            self.prev_cmd = ''
+
         if self.is_rzsz(client_cmd, self.prev_cmd):
             self._record_cmd(log_info, channel_id, cur_time)
             if self.is_rzsz(client_cmd, client_cmd):
                 self.prev_cmd = client_cmd
-            if self.is_rzsz_end(client_cmd):
-                self.prev_cmd = ''
             log_info.clear()
             return
+
 
         self._record_cmd(log_info, channel_id, cur_time)
         self._record_log(log_info, channel_id, cur_time)
@@ -302,14 +306,14 @@ class ScreenCAP:
             fp.flush()
 
     def is_rzsz(self, input_cmd, prev_cmd):
-        if re.search('sz\s+.*', input_cmd) is not None or \
-           re.search('sz\s+.*', prev_cmd) is not None or \
-           re.search('rz\s+.*', input_cmd) is not None or \
-           re.search('rz\s+.*', prev_cmd) is not None or \
+        if re.search('sz\s*.*', input_cmd) is not None or \
+           re.search('sz\s*.*', prev_cmd) is not None or \
+           re.search('rz\s*', input_cmd) is not None or \
+           re.search('rz\s*', prev_cmd) is not None or \
            input_cmd in ['rz', 'sl']:
             return True
         return False
 
     def is_rzsz_end(self, input_cmd):
-        r = re.search('\w+\s+\w+', input_cmd)
+        r = re.search('\w*\s*\w*', input_cmd)
         return False if not r else r.group() == input_cmd
