@@ -134,7 +134,7 @@ def SSHBootstrap(client, rhost, rport):
             ssh_jump = SSHJump(context, client_channel)
             ssh_jump.start()
         except:
-            LOG.error(traceback.print_exc())
+            LOG.error(traceback.format_exc())
 
     try:
         client.close()
@@ -170,7 +170,7 @@ class Bastion(Application):
                 self.pool.close()
             except Exception as _ex:
                 LOG.error('*** SSH bootstrap exception: %s' % str(_ex))
-                LOG.error(traceback.print_exc())
+                LOG.error(traceback.format_exc())
 
     def build_lisen(self):
         self.fd = socket.socket(socket.AF_INET, socket.SOCK_STREAM)

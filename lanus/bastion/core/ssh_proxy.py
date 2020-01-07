@@ -8,11 +8,15 @@
 import os
 import re
 import sys
+import copy
 import time
 import logging
 import selectors
 import traceback
 from datetime import datetime
+from multiprocessing.dummy import (
+    Pool as ThreadPool
+)
 
 import paramiko
 from oslo_config import cfg
@@ -42,17 +46,19 @@ CONF.register_opts(idle_opts, 'IDLE')
 CONF.register_opts(record_opts, 'RECORD')
 
 
-class SSHProxy(object):
+class SSHProxy:
 
     def __init__(self, context, client_channel):
         self.context = context
         self.username = context.username
         self.client_channel = client_channel
         self.password = LanusService().get_ldap_pass(self.username)
+        self.pool = ThreadPool(4)
 
     def login(self, asset_info, term='xterm', width=80, height=24):
         self.ip = asset_info.ip
         self.port = asset_info.port
+        self.screen = ScreenCAP(self.username, self.ip)
         try:
             width = self.client_channel.win_width
             height = self.client_channel.win_height
@@ -76,7 +82,7 @@ class SSHProxy(object):
         remote_host = self.context.remote_host
         login_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
         login_info = ('This Login: %s form %s' % (login_time, remote_host))
-        self.write_log(channel_id, login_info)
+        self.screen.write_log(channel_id, login_info)
         LOG.info('*** User: %s connected to host: %s success.'
                  % (self.username, self.ip))
         backend_channel = ssh_client.invoke_shell(
@@ -88,7 +94,6 @@ class SSHProxy(object):
     def interactive_shell(self, backend_channel):
         cmd_info = []
         log_info = []
-        prev_cmd = ''
         is_input_status = True
         begin_time = None
         client = self.context.client
@@ -144,6 +149,7 @@ class SSHProxy(object):
                     sys.exit(1)
                 if client_data in cm.ENTER_CHAR:
                     is_input_status = False
+                cmd_info.append(client_data)
                 backend_channel.sendall(client_data)
 
             if backend_channel in fd_sets:
@@ -159,47 +165,17 @@ class SSHProxy(object):
                     return
 
                 if is_input_status:
-                    cmd_info.append(backend_data)
                     log_info.append(backend_data)
                 else:
                     channel_id = client_channel.get_id()
-                    cur_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-                    try:
-                        # NOTE(记录命令-清洗)
-                        input_cmd = io_cleaner.input_clean(b''.join(cmd_info)).strip()
-                        if input_cmd:
-                            cmd_msg = '[%s] %s' % (cur_time, input_cmd)
-                            self.write_cmd(channel_id, cmd_msg)
-                            cmd_info.clear()
-                            prev_cmd = input_cmd
-
-                        # NOTE(记录输出-清洗)
-                        if re.search('sz\s+.*', input_cmd) is not None or \
-                           re.search('sz\s+.*', prev_cmd) is not None or \
-                           input_cmd in ['rz', 'sl']:
-                            # NOTE(sz、rz、sl等命令不记录输出)
-                            log_info.clear()
-                        else:
-                            output_msg = io_cleaner.output_clean(b''.join(log_info))
-                            self.write_log(channel_id, output_msg)
-                            log_info.clear()
-                            log_info.append(backend_data.lstrip(b'\r\n'))
-                    except:
-                        traceback.print_exc()
-                        try:
-                            # NOTE(记录命令-不清洗)
-                            input_cmd = b''.join(cmd_info).decode('utf-8', errors='ignore')
-                            cmd_msg = '[%s] %s' % (cur_time, input_cmd)
-                            self.write_cmd(channel_id, cmd_msg)
-                            cmd_info.clear()
-
-                            # NOTE(记录日志-不清洗)
-                            output_msg = b''.join(log_info).decode('utf-8', errors='ignore')
-                            self.write_log(channel_id, output_msg)
-                            log_info.clear()
-                            log_info.append(backend_data.lstrip(b'\r\n'))
-                        except:
-                            traceback.print_exc()
+                    self.pool.apply_async(
+                        self.screen.record, (channel_id, io_cleaner,
+                                             copy.copy(cmd_info),
+                                             copy.copy(log_info))
+                    )
+                    cmd_info.clear()
+                    log_info.clear()
+                    log_info.append(backend_data.lstrip(b'\r\n'))
 
                 client_channel.sendall(backend_data)
                 time.sleep(paramiko.common.io_sleep)
@@ -249,6 +225,63 @@ class SSHProxy(object):
         except:
             pass
 
+
+class ScreenCAP:
+
+    def __init__(self, username, ip):
+        self.username = username
+        self.ip = ip
+        self.prev_cmd = ''
+
+    def record(self, channel_id, io_cleaner, cmd_info, log_info):
+        self.io_cleaner = io_cleaner
+        cur_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        try:
+            self._record_all(channel_id, cmd_info, log_info, cur_time)
+        except:
+            LOG.error(traceback.format_exc())
+            self._record_raw(log_info, channel_id, cur_time)
+
+    def _record_all(self, channel_id, cmd_info, log_info, cur_time):
+        # NOTE(jinlong): 判断client_channel获取的输入是否包含sz、rz.
+        client_cmd = self.io_cleaner.input_clean(b''.join(cmd_info)).strip()
+        if self.is_rzsz(client_cmd, self.prev_cmd):
+            self._record_cmd(log_info, channel_id, cur_time)
+            if self.is_rzsz(client_cmd, client_cmd):
+                self.prev_cmd = client_cmd
+            if self.is_rzsz_end(client_cmd):
+                self.prev_cmd = ''
+            log_info.clear()
+            return
+
+        self._record_cmd(log_info, channel_id, cur_time)
+        self._record_log(log_info, channel_id, cur_time)
+        log_info.clear()
+
+    def _record_cmd(self, log_info, channel_id, cur_time):
+        """ 命令记录-清洗
+        """
+        input_cmd = self.io_cleaner.input_clean(b''.join(log_info)).strip()
+        if input_cmd:
+            cmd_msg = '[%s] %s' % (cur_time, input_cmd)
+            self.write_cmd(channel_id, cmd_msg)
+
+    def _record_log(self, log_info, channel_id, cur_time):
+        """ 日志记录-清洗
+        """
+        output_msg = self.io_cleaner.output_clean(b''.join(log_info))
+        self.write_log(channel_id, output_msg)
+
+    def _record_raw(self, log_info, channel_id, cur_time):
+        """ 原始日志记录-未清洗
+        """
+        try:
+            output_msg = b''.join(log_info).decode('utf-8', errors='ignore')
+            self.write_log(channel_id, output_msg)
+            log_info.clear()
+        except:
+            LOG.error(traceback.format_exc())
+
     def write_log(self, channel_id, operation_info):
         self._write(channel_id, 'log', operation_info)
 
@@ -267,3 +300,16 @@ class SSHProxy(object):
             fp.write(operation_info)
             fp.write('\n')
             fp.flush()
+
+    def is_rzsz(self, input_cmd, prev_cmd):
+        if re.search('sz\s+.*', input_cmd) is not None or \
+           re.search('sz\s+.*', prev_cmd) is not None or \
+           re.search('rz\s+.*', input_cmd) is not None or \
+           re.search('rz\s+.*', prev_cmd) is not None or \
+           input_cmd in ['rz', 'sl']:
+            return True
+        return False
+
+    def is_rzsz_end(self, input_cmd):
+        r = re.search('\w+\s+\w+', input_cmd)
+        return False if not r else r.group() == input_cmd
