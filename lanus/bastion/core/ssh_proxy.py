@@ -245,7 +245,8 @@ class ScreenCAP:
     def _record_all(self, channel_id, cmd_info, log_info, cur_time):
         # NOTE(jinlong): 判断client_channel获取的输入是否包含sz、rz.
         client_cmd = self.io_cleaner.input_clean(b''.join(cmd_info)).strip()
-        if self.prev_cmd and self.is_rzsz(self.prev_cmd, self.prev_cmd) and \
+        if self.prev_cmd and client_cmd and \
+           self.is_rzsz(self.prev_cmd, self.prev_cmd) and \
            self.is_rzsz_end(client_cmd):
             LOG.info('** End rz/sz because input cmd: %s' % client_cmd)
             self.prev_cmd = ''
@@ -256,7 +257,6 @@ class ScreenCAP:
                 self.prev_cmd = client_cmd
             log_info.clear()
             return
-
 
         self._record_cmd(log_info, channel_id, cur_time)
         self._record_log(log_info, channel_id, cur_time)
