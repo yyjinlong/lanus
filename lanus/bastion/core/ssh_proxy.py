@@ -243,7 +243,7 @@ class ScreenCAP:
             self._record_raw(log_info, channel_id, cur_time)
 
     def _record_all(self, channel_id, cmd_info, log_info, cur_time):
-        # NOTE(jinlong): 判断client_channel获取的输入是否包含sz、rz.
+        # NOTE(当rz、sz执行完成后释放prev_cmd, 以便进行正常的命令及输出记录.)
         client_cmd = self.io_cleaner.input_clean(b''.join(cmd_info)).strip()
         if self.prev_cmd and client_cmd and \
            self.is_rzsz(self.prev_cmd, self.prev_cmd) and \
@@ -251,6 +251,7 @@ class ScreenCAP:
             LOG.info('** End rz/sz because input cmd: %s' % client_cmd)
             self.prev_cmd = ''
 
+        # NOTE(判断client_channel获取的输入是否包含rz、sz.)
         if self.is_rzsz(client_cmd, self.prev_cmd):
             self._record_cmd(log_info, channel_id, cur_time)
             if self.is_rzsz(client_cmd, client_cmd):
