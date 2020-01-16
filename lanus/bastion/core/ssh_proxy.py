@@ -149,7 +149,7 @@ class SSHProxy:
                     sys.exit(1)
                 if client_data in cm.ENTER_CHAR:
                     is_input_status = False
-                cmd_info.append(client_data)
+                cmd_info.append(client_data.decode('utf8', errors='ignore'))
                 backend_channel.sendall(client_data)
 
             if backend_channel in fd_sets:
@@ -244,7 +244,7 @@ class ScreenCAP:
 
     def _record_all(self, channel_id, cmd_info, log_info, cur_time):
         # NOTE(当rz、sz执行完成后释放prev_cmd, 以便进行正常的命令及输出记录.)
-        client_cmd = self.io_cleaner.input_clean(b''.join(cmd_info)).strip()
+        client_cmd = ''.join(cmd_info)[:100]
         if self.prev_cmd and client_cmd and \
            self.is_rzsz(self.prev_cmd, self.prev_cmd) and \
            self.is_rzsz_end(client_cmd):
@@ -282,7 +282,8 @@ class ScreenCAP:
         """
         try:
             output_msg = b''.join(log_info).decode('utf-8', errors='ignore')
-            self.write_log(channel_id, output_msg)
+            output_cnt = '[%s] %s' % (cur_time, output_msg)
+            self.write_log(channel_id, output_cnt)
             log_info.clear()
         except:
             LOG.error(traceback.format_exc())
