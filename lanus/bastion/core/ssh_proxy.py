@@ -10,13 +10,12 @@ import re
 import sys
 import copy
 import time
+import queue
 import logging
 import selectors
+import threading
 import traceback
 from datetime import datetime
-from multiprocessing.dummy import (
-    Pool as ThreadPool
-)
 
 import paramiko
 from oslo_config import cfg
@@ -53,12 +52,15 @@ class SSHProxy:
         self.username = context.username
         self.client_channel = client_channel
         self.password = LanusService().get_ldap_pass(self.username)
-        self.pool = ThreadPool(4)
+        self.pipe = queue.Queue()
 
     def login(self, asset_info, term='xterm', width=80, height=24):
         self.ip = asset_info.ip
         self.port = asset_info.port
-        self.screen = ScreenCAP(self.username, self.ip)
+        # NOTE: 单线程慢慢处理屏幕记录; 原因: 多线程有问题;
+        screen = ScreenCAP(self.username, self.ip, self.pipe)
+        screen.start()
+
         try:
             width = self.client_channel.win_width
             height = self.client_channel.win_height
@@ -82,7 +84,7 @@ class SSHProxy:
         remote_host = self.context.remote_host
         login_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
         login_info = ('This Login: %s form %s' % (login_time, remote_host))
-        self.screen.write_log(channel_id, login_info)
+        screen.write_log(channel_id, login_info)
         LOG.info('*** User: %s connected to host: %s success.'
                  % (self.username, self.ip))
         backend_channel = ssh_client.invoke_shell(
@@ -168,11 +170,8 @@ class SSHProxy:
                     log_info.append(backend_data)
                 else:
                     channel_id = client_channel.get_id()
-                    self.pool.apply_async(
-                        self.screen.record, (channel_id, io_cleaner,
-                                             copy.copy(cmd_info),
-                                             copy.copy(log_info))
-                    )
+                    self.pipe.put((channel_id, io_cleaner,
+                                   copy.copy(cmd_info), copy.copy(log_info)))
                     cmd_info.clear()
                     log_info.clear()
                     log_info.append(backend_data.lstrip(b'\r\n'))
@@ -226,12 +225,19 @@ class SSHProxy:
             pass
 
 
-class ScreenCAP:
+class ScreenCAP(threading.Thread):
 
-    def __init__(self, username, ip):
+    def __init__(self, username, ip, pipe):
+        super(ScreenCAP, self).__init__()
         self.username = username
         self.ip = ip
+        self.pipe = pipe
         self.prev_cmd = ''
+
+    def run(self):
+        while True:
+            data = self.pipe.get()
+            self.record(*data)
 
     def record(self, channel_id, io_cleaner, cmd_info, log_info):
         self.io_cleaner = io_cleaner
@@ -267,7 +273,7 @@ class ScreenCAP:
         """ 命令记录-清洗
         """
         input_cmd = self.io_cleaner.input_clean(b''.join(log_info)).strip()
-        if input_cmd:
+        if input_cmd.strip():
             cmd_msg = '[%s] %s' % (cur_time, input_cmd)
             self.write_cmd(channel_id, cmd_msg)
 
