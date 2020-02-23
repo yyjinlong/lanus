@@ -282,7 +282,7 @@ class ScreenCAP(threading.Thread):
         if not os.path.isdir(record_path):
             os.mkdir(record_path)
         record_file = '%s/%s_%s_%s.%s' % (record_path, self.ip,
-                                           self.username, channel_id, log_type)
+                                          self.username, channel_id, log_type)
         with open(record_file, 'a') as fp:
             fp.write(content)
             fp.write('\n')

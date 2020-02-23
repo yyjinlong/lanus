@@ -31,7 +31,7 @@ class SSHServerInterface(paramiko.ServerInterface):
         return paramiko.AUTH_FAILED
 
     def check_auth_publickey(self, username, public_key):
-        # NOTE(使用密码+OTP方式, 所以不需要使用公钥认证)
+        # NOTE: 使用密码+OTP方式, 所以不需要使用公钥认证.
         return paramiko.AUTH_SUCCESSFUL
 
     def check_channel_request(self, kind, chanid):
@@ -41,8 +41,9 @@ class SSHServerInterface(paramiko.ServerInterface):
 
     def check_channel_pty_request(self, channel, term, width, height,
                                   pixelwidth, pixelheight, modes):
-        # NOTE(win_width and win_height in ``context`` or ``client channel``,
-        # but the main usage ``context``)
+        # NOTE: win_width and win_height in ``context`` or ``client channel``,
+        #       but the main usage ``context``.
+        # step1: 获取当前终端模拟器(里面已实现伪终端)的窗口大小.
         channel.win_width = width
         channel.win_height = height
         LOG.info('*** Interface check channel pty term: %s size: (%s, %s)'
@@ -50,6 +51,7 @@ class SSHServerInterface(paramiko.ServerInterface):
         return True
 
     def check_channel_shell_request(self, channel):
+        # step2: 在该终端模拟器(伪终端)运行shell.
         self.shell_request_event.set()
         return True
 
@@ -60,9 +62,9 @@ class SSHServerInterface(paramiko.ServerInterface):
         channel.win_width = width
         channel.win_height = height
 
-        # NOTE(一个channel对应一个线程、一个channel对应一个队列)
-        # NOTE(主进程感知某个channel的窗口变化, 将数据发送到对应的队列中,
-        #      channel线程从队列取出数据, 根据该数据动态调整窗口大小.)
+        # NOTE: 一个channel对应一个线程、一个channel对应一个队列.
+        # NOTE: 主进程感知某个channel的窗口变化, 将数据发送到对应的队列中,
+        #       channel线程从队列取出数据, 根据该数据动态调整窗口大小.
         change_data = {'width': width, 'height': height}
         self.context[channel].put(change_data)
         LOG.debug('*** Interface check channel: %s window change data: '
