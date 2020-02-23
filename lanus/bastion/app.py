@@ -19,10 +19,12 @@ from dotmap import DotMap
 from oslo_config import cfg
 from osmo.base import Application
 
-import lanus.util.common as cm
-from lanus.bastion.core.ssh_intf import SSHKeyGen
-from lanus.bastion.core.ssh_intf import SSHServer
-from lanus.bastion.core.ssh_jump import SSHJump
+import lanus.bastion.common as cm
+from lanus.bastion.sshd.interface import (
+    SSHKeyGen,
+    SSHServerInterface
+)
+from lanus.bastion.sshd.interactive import SSHInteractive
 
 LOG = logging.getLogger(__name__)
 
@@ -69,7 +71,7 @@ def SSHBootstrap(client, rhost, rport):
     context.transport = transport
     transport.add_server_key(SSHKeyGen.rsa_key())
 
-    ssh_server = SSHServer(context)
+    ssh_server = SSHServerInterface(context)
     try:
         transport.start_server(server=ssh_server)
     except paramiko.SSHException as _ex:
@@ -131,8 +133,8 @@ def SSHBootstrap(client, rhost, rport):
 
         # NOTE(client channel 不能多线程共享全局变量, 否则session就会乱)
         try:
-            ssh_jump = SSHJump(context, client_channel)
-            ssh_jump.start()
+            ssh_interactive = SSHInteractive(context, client_channel)
+            ssh_interactive.start()
         except:
             LOG.error(traceback.format_exc())
 
@@ -152,7 +154,8 @@ class Bastion(Application):
         super(Bastion, self).__init__()
         self.host = CONF.SERVER.host
         self.port = CONF.SERVER.port
-        self.pool = multiprocessing.Pool(CONF.SERVER.pool_limit, SignalHandler)
+        self.limit = CONF.SERVER.pool_limit
+        self.pool = multiprocessing.Pool(self.limit, SignalHandler)
 
     def run(self):
         self.build_lisen()
@@ -168,7 +171,9 @@ class Bastion(Application):
             except KeyboardInterrupt:
                 self.pool.terminate()
                 self.pool.close()
+                self.close()
             except Exception as _ex:
+                self.close()
                 LOG.error('*** SSH bootstrap exception: %s' % str(_ex))
                 LOG.error(traceback.format_exc())
 
@@ -176,7 +181,7 @@ class Bastion(Application):
         self.fd = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.fd.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         self.fd.bind((self.host, self.port))
-        self.fd.listen(500)
+        self.fd.listen(self.limit)
 
     def close(self):
         try:

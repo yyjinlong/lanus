@@ -12,12 +12,12 @@ from io import StringIO
 
 import paramiko
 
-from lanus.bastion.lib.service import LanusService
+from lanus.bastion.lib.checker import Auth
 
 LOG = logging.getLogger(__name__)
 
 
-class SSHServer(paramiko.ServerInterface):
+class SSHServerInterface(paramiko.ServerInterface):
 
     def __init__(self, context):
         self.context = context
@@ -25,8 +25,7 @@ class SSHServer(paramiko.ServerInterface):
         context.change_win_size_event = threading.Event()
 
     def check_auth_password(self, username, password):
-        hs = LanusService()
-        if hs.validate(username, password):
+        if Auth().validate(username, password):
             self.context.username = username
             return paramiko.AUTH_SUCCESSFUL
         return paramiko.AUTH_FAILED
@@ -85,7 +84,7 @@ class SSHKeyGen(object):
 
     @classmethod
     def create_rsa_key(cls, filename, length=2048, password=None):
-        """ Generating private key
+        """Generating private key.
         """
         f = StringIO()
         prv = paramiko.RSAKey.generate(length)

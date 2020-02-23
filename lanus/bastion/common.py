@@ -12,8 +12,7 @@ from oslo_config import cfg
 LOG = logging.getLogger(__name__)
 
 intf_opts = [
-    cfg.StrOpt('salt',
-               help='bastion service interface md5 salt value.'),
+    cfg.StrOpt('salt', help='bastion service interface md5 salt value.'),
 ]
 
 CONF = cfg.CONF
@@ -99,7 +98,7 @@ def tools_nav():
 
 
 def ws(s, before=0, after=1, level='info'):
-    """ Wrap string info with line feed.
+    """Wrap string info with line feed.
     """
     tip = ''
     if level == 'info':
@@ -110,7 +109,7 @@ def ws(s, before=0, after=1, level='info'):
 
 
 def wc(s, has_bg=True):
-    """ Wrap string with color.
+    """Wrap string with color.
     """
     if has_bg:
         return '\033[0;30;45m' + s + '\033[0m'

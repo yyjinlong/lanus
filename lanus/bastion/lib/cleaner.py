@@ -6,16 +6,13 @@
 #
 
 import re
-import logging
 
 import pyte
 
-LOG = logging.getLogger(__name__)
 
+class IOCleaner:
 
-class IOCleaner(object):
-
-    def __init__(self, width=175, height=40):
+    def __init__(self, width=167, height=33):
         self.screen = pyte.Screen(width, height)
         self.stream = pyte.ByteStream()
         self.stream.attach(self.screen)
@@ -41,4 +38,4 @@ class IOCleaner(object):
             screen_info = display_list[-1]
         else:
             screen_info = ''
-        return self.ps1_pattern.sub('', screen_info)
+        return self.ps1_pattern.sub('', screen_info).strip()

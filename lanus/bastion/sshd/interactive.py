@@ -14,33 +14,30 @@ import traceback
 
 from oslo_config import cfg
 
-import lanus.util.common as cm
-from lanus.bastion.lib.tools import Tools
-from lanus.bastion.core.ssh_proxy import SSHProxy
-from lanus.bastion.lib.service import LanusService
+import lanus.bastion.common as cm
+from lanus.bastion.lib.checker import Auth
+from lanus.bastion.lib.toolkit import Toolkit
+from lanus.bastion.sshd.proxy import SSHProxy
 
 LOG = logging.getLogger(__name__)
 
 idle_opts = [
-    cfg.IntOpt(
-        'timeout',
-        help='Noting to do timeout.'
-    )
+    cfg.IntOpt('timeout', help='Noting to do timeout.')
 ]
 
 CONF = cfg.CONF
 CONF.register_opts(idle_opts, 'IDLE')
 
 
-class SSHJump(threading.Thread):
+class SSHInteractive(threading.Thread):
 
     def __init__(self, context, client_channel):
-        super(SSHJump, self).__init__()
+        super().__init__()
         self.context = context
         self.client = context.client
         self.username = context.username
         self.client_channel = client_channel
-        self.assets = LanusService().get_user_asset(self.username)
+        self.assets = Auth().get_user_asset(self.username)
 
     def run(self):
         self.display_banner()
@@ -133,14 +130,13 @@ class SSHJump(threading.Thread):
         LOG.info('Logout relay from %s:%s' % (remote_host, self.username))
 
     def readline(self, prompt=cm.PROMPT):
-        """ Read one line data from the stream.
+        """Read one line data from the stream.
 
-        This method is a coroutine which reads one line, ending in
-        ``'\n'``.
+        This method is a coroutine which reads one line, ending in ``'\n'``.
 
-        If EOF is received before ``'\n'`` is found, the partial
-        line is returned. If EOF is received and the receive buffer
-        is empty, an empty bytes or str object is returned.
+        If EOF is received before ``'\n'`` is found, the partial line is
+        returned. If EOF is received and the receive buffer is empty, an empty
+        bytes or str object is returned.
         """
         input_data = []
         timeout = CONF.IDLE.timeout
@@ -228,7 +224,8 @@ class SSHJump(threading.Thread):
         tips = cm.tools_nav()
         self.client_channel.sendall(cm.CLEAR_CHAR)
         self.client_channel.sendall(cm.ws(tips, before=0, after=2))
-        tool_layer = Tools()
+        tool_layer = Toolkit()
+
         while True:
             self.client_channel.sendall(cm.ws(prompt, before=0, after=0))
             option = self.readline(prompt)

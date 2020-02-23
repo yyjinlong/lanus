@@ -23,7 +23,7 @@ class MockApi(WSGIApplication):
         self.register(app)
 
     def register(self, app):
-        import lanus.mock.v1 as v1
+        import lanus.mockapi.v1 as v1
         app.register_blueprint(v1.bp, url_prefix='')
 
 

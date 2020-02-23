@@ -5,13 +5,10 @@
 # Author: Jinlong Yang
 #
 
-import lanus.util.common as cm
+import lanus.bastion.common as cm
 
 
-class Tools(object):
-
-    def __init__(self):
-        pass
+class Toolkit:
 
     def run_ip(self, ip):
         hostname = 'l-jinlong.op.test.dx'

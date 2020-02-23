@@ -1,15 +1,14 @@
-Lanus
-----
+Lanus is door-god
+=================
+yangjinlong
+
 
 ## Features
 
-* OTP Certification
-
-* LDAP User Manage
-
-* Command Record
-
-* Log clean
+    * OTP Certification
+    * LDAP User Manage
+    * Command Record
+    * Log Clean
 
 
 ## Install
@@ -24,8 +23,5 @@ Lanus
     bastion server:
     $ tools/with_venv.sh lanus-bastion --config-file=etc/dev.conf
 
-
-## Mock Test
-
-    mock api server:
+    mockapi server:
     $ tools/with_venv.sh lanus-mockapi --config-file=etc/dev.conf
