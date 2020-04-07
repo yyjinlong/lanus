@@ -227,6 +227,7 @@ class SSHInteractive(threading.Thread):
             self.client.close()
             self.context.transport.atfork()
         elif not self.context.channel_list:
+            # NOTE: 先关闭channel、再关闭client socket、最后关闭server.
             self.client_channel.close()
             self.client.close()
             self.context.transport.atfork()
