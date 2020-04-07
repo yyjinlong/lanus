@@ -8,6 +8,7 @@
 import re
 import sys
 import time
+import select
 import logging
 import threading
 import traceback
@@ -142,65 +143,74 @@ class SSHInteractive(threading.Thread):
         timeout = CONF.IDLE.timeout
         begin_time = int(time.time())
         while True:
-            data = self.client_channel.recv(1024)
-
+            r, w, x = select.select([self.client_channel], [], [], timeout)
+            LOG.info('*** user: %s readable writeable exceptable socket fd: '
+                     '(%s, %s, %s)' % (self.username, r, w, x))
             # NOTE(超时处理)
             cur_time = int(time.time())
-            if (cur_time - begin_time) > timeout:
-                LOG.info('*** User: %s idle timeout > %s.'
-                         % (self.username, timeout))
+            if not (r or w or x) or (cur_time - begin_time) > timeout:
+                LOG.info('*** user: %s record interactive begin time: %s'
+                         % (self.username, begin_time))
+                LOG.info('*** user: %s record interactive end time: %s'
+                         % (self.username, cur_time))
+                LOG.info('*** user: %s current time - begin time = %s'
+                         % (self.username, cur_time - begin_time))
                 self.timeout_handle()
                 self.exception_handle()
                 sys.exit(1)
 
-            # NOTE(客户端关闭)
-            if 0 == len(data):
-                LOG.info('*** Interactive client from user: %s input data '
-                         'is 0, so exit.' % (self.username))
-                self.exception_handle()
-                sys.exit(1)
+            if self.client_channel in r:
+                data = self.client_channel.recv(1024)
 
-            # NOTE(上下键及不支持的键)
-            if data.startswith(b'\x1b') or data in cm.UNSUPPORT_CHAR:
-                self.client_channel.sendall('')
-                continue
+                # NOTE(客户端关闭)
+                if 0 == len(data):
+                    LOG.info('*** Interactive client from user: %s input data '
+                             'is 0, so exit.' % (self.username))
+                    self.exception_handle()
+                    sys.exit(1)
 
-            # NOTE(Ctrl-L 清屏)
-            if data.startswith(b'\x0c'):
-                self.client_channel.sendall(cm.CLEAR_CHAR)
-                self.client_channel.sendall(cm.ws(prompt, before=1, after=0))
-                continue
+                # NOTE(上下键及不支持的键)
+                if data.startswith(b'\x1b') or data in cm.UNSUPPORT_CHAR:
+                    self.client_channel.sendall('')
+                    continue
 
-            # NOTE(Ctrl-U 清行)
-            if data.startswith(b'\x15'):
-                clear_line_char = cm.BACKSPACE_CHAR[b'\x7f']
-                for i in range(len(input_data)):
-                    self.client_channel.sendall(clear_line_char)
-                input_data.clear()
-                continue
+                # NOTE(Ctrl-L 清屏)
+                if data.startswith(b'\x0c'):
+                    self.client_channel.sendall(cm.CLEAR_CHAR)
+                    self.client_channel.sendall(cm.ws(prompt, before=1, after=0))
+                    continue
 
-            # NOTE(删除符)
-            if data in cm.BACKSPACE_CHAR:
-                if len(input_data) > 0:
-                    data = cm.BACKSPACE_CHAR[data]
-                    input_data.pop()
+                # NOTE(Ctrl-U 清行)
+                if data.startswith(b'\x15'):
+                    clear_line_char = cm.BACKSPACE_CHAR[b'\x7f']
+                    for i in range(len(input_data)):
+                        self.client_channel.sendall(clear_line_char)
+                    input_data.clear()
+                    continue
+
+                # NOTE(删除符)
+                if data in cm.BACKSPACE_CHAR:
+                    if len(input_data) > 0:
+                        data = cm.BACKSPACE_CHAR[data]
+                        input_data.pop()
+                    else:
+                        data = cm.BELL_CHAR
+                    self.client_channel.sendall(data)
+                    continue
+
+                # NOTE(回车符转到相应处理函数)
+                if data in cm.ENTER_CHAR:
+                    self.client_channel.sendall(cm.ws('', after=1))
+                    option = b''.join(input_data).strip().decode()
+                    return option
                 else:
-                    data = cm.BELL_CHAR
-                self.client_channel.sendall(data)
-                continue
-
-            # NOTE(回车符转到相应处理函数)
-            if data in cm.ENTER_CHAR:
-                self.client_channel.sendall(cm.ws('', after=1))
-                option = b''.join(input_data).strip().decode()
-                return option
-
-            try:
-                # NOTE(终端关闭或连接断开, 此时send会有异常)
-                self.client_channel.sendall(data)
-            except:
-                pass
-            input_data.append(data)
+                    # NOTE(按下终端快捷键关闭窗口, 也就是断开连接,
+                    #      此时发送数据会有异常)
+                    try:
+                        self.client_channel.sendall(data)
+                        input_data.append(data)
+                    except:
+                        pass
 
     def timeout_handle(self):
         tips = '\033[1;31mLogout\r\n'
@@ -210,11 +220,16 @@ class SSHInteractive(threading.Thread):
         LOG.warn('*** User %s idle timeout, so disconnect.' % self.username)
 
     def exception_handle(self):
-        if self.client_channel == self.context.channel_list[0]:
+        if self.context.channel_list and \
+           self.client_channel == self.context.channel_list[0]:
             for channel in self.context.channel_list:
                 channel.close()
-            self.context.transport.atfork()
             self.client.close()
+            self.context.transport.atfork()
+        elif not self.context.channel_list:
+            self.client_channel.close()
+            self.client.close()
+            self.context.transport.atfork()
         else:
             if self.client_channel in self.context.channel_list:
                 self.context.channel_list.remove(self.client_channel)
